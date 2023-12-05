@@ -504,6 +504,12 @@ vocab = vectorization.get_vocabulary()
 index_lookup = dict(zip(range(len(vocab)), vocab))
 max_decoded_sentence_length = SEQ_LENGTH - 1
 
+def decode_and_resize(img):
+    img = tf.image.decode_image(tf.io.encode_jpeg(np.array(img)))
+    img = tf.image.resize(img, IMAGE_SIZE)
+    img = tf.image.convert_image_dtype(img, tf.float32)
+    return img
+
 uploaded_file = st.file_uploader("", type=["jpg"])
 if uploaded_file is not None:
     img = Image.open(uploaded_file)
@@ -529,16 +535,16 @@ if uploaded_file is not None:
     except:
         pass
     caption_model.load_weights("vgg19-4.keras")
-    img = Image.open(uploaded_file)
     st.write("")
     st.write("Generating Caption...")
     st.write("")
     
     cols = cycle(st.columns(3)) 
-    img = ImageOps.fit(img, IMAGE_SIZE, Image.LANCZOS)
-    img = np.asarray(img)
-    img = tf.expand_dims(img, axis=0)
-    img = tf.cast(img, dtype=tf.float32) / 255.0
+    img = Image.open(uploaded_file).resize(IMAGE_SIZE)
+    img = decode_and_resize(img)
+    img = img.numpy().clip(0, 255).astype(np.uint8)
+
+    img = tf.expand_dims(img, 0)
 
     img = caption_model.cnn_model(img)
 
@@ -553,7 +559,6 @@ if uploaded_file is not None:
         )
 
         sampled_token_index = np.argmax(predictions[0, i, :])
-        print(index_lookup)
         sampled_token = index_lookup[sampled_token_index]
         if sampled_token == "<end>":
             break
